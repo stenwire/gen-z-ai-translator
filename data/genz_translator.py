@@ -50,59 +50,115 @@ class GenZTranslator:
         return results['metadatas'][0] if results['metadatas'] else []
 
     def translate_to_genz(self, text: str):
-      if not isinstance(text, str) or not text.strip():
-        return "Error: Invalid or empty input text."
-      try:
-          relevant_terms = self.get_relevant_genz_terms(text, top_k=7)
-          terms_for_llm = ""
-          if relevant_terms:
-              terms_for_llm = "Here are some relevant Gen Z terms and their meanings you *must* try to incorporate naturally, along with emojis:\n"
-              for term_data in relevant_terms:
-                  terms_for_llm += f"- **{term_data['term']}**: {term_data['definition']} (Example: {term_data['example']})\n"
-          else:
-              terms_for_llm = "No specific dictionary terms were highly relevant, but use general Gen Z slang and emojis naturally."
+        if not isinstance(text, str) or not text.strip():
+            return "Error: Invalid or empty input text."
+        try:
+            relevant_terms = self.get_relevant_genz_terms(text, top_k=7)
+            terms_for_llm = ""
+            if relevant_terms:
+                terms_for_llm = "Here are some relevant Gen Z terms and their meanings you *must* try to incorporate naturally, along with emojis:\n"
+                for term_data in relevant_terms:
+                    terms_for_llm += f"- **{term_data['term']}**: {term_data['definition']} (Example: {term_data['example']})\n"
+            else:
+                terms_for_llm = "No specific dictionary terms were highly relevant, but use general Gen Z slang and emojis naturally."
 
-          if self.llm_provider == "google":
-              import google.generativeai as genai
-              api_key = os.getenv("GOOGLE_API_KEY")
-              if not api_key:
-                  return "Error: Missing GOOGLE_API_KEY."
-              genai.configure(api_key=api_key)
-              model = genai.GenerativeModel(self.llm_model_name)
-              system_instruction = f"""
-              You are an expert in 2025 Gen Z slang and emojis. Your task is to convert the user's message into authentic 2025 Gen Z slang.
-              Maintain the original meaning and tone, and incorporate relevant emojis naturally.
-              {terms_for_llm}
-              Do NOT explain your translation or refer to the dictionary. Just provide the Gen Z version.
-              """
-              response = model.generate_content(
-                  system_instruction + f"\nUser message: {text}\nGen Z conversion:",
-                  generation_config=genai.types.GenerationConfig(temperature=0.7)
-              )
-              return response.text
-          elif self.llm_provider == "openai":
-              import openai
-              openai.api_key = os.getenv("OPENAI_API_KEY")
-              if not openai.api_key:
-                  return "Error: Missing OPENAI_API_KEY."
-              response = openai.chat.completions.create(
-                  model="gpt-4",
-                  messages=[
-                      {"role": "system", "content": f"""
-                        You are an expert in 2025 Gen Z slang and emojis. Your task is to convert the user's message into authentic 2025 Gen Z slang.
-                        Maintain the original meaning and tone, and incorporate relevant emojis naturally.
-                        {terms_for_llm}
-                        Do NOT explain your translation or refer to the dictionary. Just provide the Gen Z version.
-                        """},
-                      {"role": "user", "content": f"User message: {text}\nGen Z conversion:"}
-                  ],
-                  temperature=0.7,
-              )
-              return response.choices[0].message.content
-          else:
-              return "Error: Unsupported LLM provider."
-      except Exception as e:
-          return f"Error: Failed to translate due to {str(e)}. Please try again."
+            if self.llm_provider == "google":
+                import google.generativeai as genai
+                api_key = os.getenv("GOOGLE_API_KEY")
+                if not api_key:
+                    return "Error: Missing GOOGLE_API_KEY."
+                genai.configure(api_key=api_key)
+                model = genai.GenerativeModel(self.llm_model_name)
+                system_instruction = f"""
+                You are an expert in 2025 Gen Z slang and emojis. Your task is to convert the user's message into authentic 2025 Gen Z slang.
+                Maintain the original meaning and tone, and incorporate relevant emojis naturally.
+                {terms_for_llm}
+                Do NOT explain your translation or refer to the dictionary. Just provide the Gen Z version.
+                """
+                response = model.generate_content(
+                    system_instruction + f"\nUser message: {text}\nGen Z conversion:",
+                    generation_config=genai.types.GenerationConfig(temperature=0.7)
+                )
+                return response.text
+            elif self.llm_provider == "openai":
+                import openai
+                openai.api_key = os.getenv("OPENAI_API_KEY")
+                if not openai.api_key:
+                    return "Error: Missing OPENAI_API_KEY."
+                response = openai.chat.completions.create(
+                    model="gpt-4",
+                    messages=[
+                        {"role": "system", "content": f"""
+                            You are an expert in 2025 Gen Z slang and emojis. Your task is to convert the user's message into authentic 2025 Gen Z slang.
+                            Maintain the original meaning and tone, and incorporate relevant emojis naturally.
+                            {terms_for_llm}
+                            Do NOT explain your translation or refer to the dictionary. Just provide the Gen Z version.
+                            """},
+                        {"role": "user", "content": f"User message: {text}\nGen Z conversion:"}
+                    ],
+                    temperature=0.7,
+                )
+                return response.choices[0].message.content
+            else:
+                return "Error: Unsupported LLM provider."
+        except Exception as e:
+            return f"Error: Failed to translate due to {str(e)}. Please try again."
+
+    def translate_to_english(self, text: str):
+        if not isinstance(text, str) or not text.strip():
+            return "Error: Invalid or empty input text."
+        try:
+            relevant_terms = self.get_relevant_genz_terms(text, top_k=7)
+            terms_for_llm = ""
+            if relevant_terms:
+                terms_for_llm = "Here are some relevant Gen Z terms and their meanings that might be in the text:\n"
+                for term_data in relevant_terms:
+                    terms_for_llm += f"- **{term_data['term']}**: {term_data['definition']} (Example: {term_data['example']})\n"
+            else:
+                terms_for_llm = "No specific dictionary terms were highly relevant, but try to interpret any Gen Z slang."
+
+            if self.llm_provider == "google":
+                import google.generativeai as genai
+                api_key = os.getenv("GOOGLE_API_KEY")
+                if not api_key:
+                    return "Error: Missing GOOGLE_API_KEY."
+                genai.configure(api_key=api_key)
+                model = genai.GenerativeModel(self.llm_model_name)
+                system_instruction = f"""
+                You are an expert in 2025 Gen Z slang. Your task is to translate the user's message from Gen Z slang into standard, clear English.
+                Maintain the original meaning and tone.
+                {terms_for_llm}
+                Do NOT explain your translation. Just provide the standard English version.
+                """
+                response = model.generate_content(
+                    system_instruction + f"\nUser message: {text}\nEnglish conversion:",
+                    generation_config=genai.types.GenerationConfig(temperature=0.7)
+                )
+                return response.text
+            elif self.llm_provider == "openai":
+                import openai
+                openai.api_key = os.getenv("OPENAI_API_KEY")
+                if not openai.api_key:
+                    return "Error: Missing OPENAI_API_KEY."
+                response = openai.chat.completions.create(
+                    model="gpt-4",
+                    messages=[
+                        {"role": "system", "content": f"""
+                            You are an expert in 2025 Gen Z slang. Your task is to translate the user's message from Gen Z slang into standard, clear English.
+                            Maintain the original meaning and tone.
+                            {terms_for_llm}
+                            Do NOT explain your translation. Just provide the standard English version.
+                            """},
+                        {"role": "user", "content": f"User message: {text}\nEnglish conversion:"}
+                    ],
+                    temperature=0.7,
+                )
+                return response.choices[0].message.content
+            else:
+                return "Error: Unsupported LLM provider."
+        except Exception as e:
+            return f"Error: Failed to translate due to {str(e)}. Please try again."
+
 # Example usage:
 if __name__ == "__main__":
     import os

@@ -86,43 +86,6 @@ function YourMainContent({ themeColor }: { themeColor: string }) {
     }
   });
 
-  useCopilotAction({
-    name: "choose_translation_direction",
-    available: "enabled",
-    description: "Asks the user to choose a translation direction.",
-    parameters: [
-      { name: "text", type: "string", description: "The text to translate", required: true },
-    ],
-    renderAndWaitForResponse: ({ args, respond }) => {
-      return (
-        <div className="mt-4 mb-4 bg-black/20 backdrop-blur-lg p-6 rounded-xl">
-          <h3 className="text-white text-lg font-semibold mb-4">
-            What would you like to do with the text:
-          </h3>
-          <p className="text-white mb-6 italic">&ldquo;{args.text}&rdquo;</p>
-          <div className="flex gap-4">
-            <button
-              onClick={() => {
-                if (respond) respond({ direction: "to_genz" });
-              }}
-              className="border-2 border-blue-500 hover:bg-blue-500 hover:text-white text-blue-500 p-3 rounded-xl w-full transition-all duration-200 font-medium"
-            >
-              Translate to Gen-Z
-            </button>
-            <button
-              onClick={() => {
-                if (respond) respond({ direction: "to_english" });
-              }}
-              className="bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-xl w-full transition-all duration-200 font-medium"
-            >
-              Translate to English
-            </button>
-          </div>
-        </div>
-      );
-    }
-  });
-
   //🪁 Generative UI: https://docs.copilotkit.ai/coagents/generative-ui
   useCopilotAction({
     name: "get_weather",

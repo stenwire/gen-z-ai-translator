@@ -47,7 +47,7 @@ class TranslationsState(BaseModel):
     )
 
 
-def get_genz_translation(
+def get_translations(
     user_input: str
 ) -> TranslationResponse:
     """
@@ -65,37 +65,6 @@ def get_genz_translation(
     try:
         initiate_translator = GenZTranslator()
         translated_text = initiate_translator.translate_to_genz(user_input)
-        print(f"\n translated_text: {translated_text}")
-        return {
-            "status": "success",
-            "message": "Translated successfully",
-            "data": {
-                "original_text": user_input,
-                "translated_text": translated_text
-            }
-        }
-
-    except Exception as e:
-        return {"status": "error", "message": f"Error obtaining translation: {str(e)}"}
-
-def get_english_translation(
-    user_input: str
-) -> TranslationResponse:
-    """
-    Translates user input from gen-z lingua to english.
-
-    Args:
-        "new_translations": {
-            "type": "string",
-            "description": "The user input that needs translation",
-        }
-
-    Returns:
-        Dict containing original input and translated text in the data field
-    """
-    try:
-        initiate_translator = GenZTranslator()
-        translated_text = initiate_translator.translate_to_english(user_input)
         print(f"\n translated_text: {translated_text}")
         return {
             "status": "success",
@@ -135,23 +104,6 @@ def set_translations(
     except Exception as e:
         return {"status": "error", "message": f"Error updating translations: {str(e)}"}
 
-
-def choose_translation_direction(
-    text: str
-) -> Dict[str, str]:
-    """
-    This function triggers the human-in-the-loop UI for choosing translation direction.
-    The actual logic is handled on the frontend.
-
-    Args:
-        text: The text to be translated
-
-    Returns:
-        Dict containing the chosen direction ("to_genz" or "to_english")
-    """
-    # The actual implementation is handled by the frontend
-    # The function will return the direction chosen by the user
-    return {"direction": ""}
 
 def on_before_agent(callback_context: CallbackContext):
     """
@@ -232,21 +184,19 @@ translations_agent = LlmAgent(
         IMPORTANT RULES ABOUT TRANSLATIONS AND THE SET_TRANSLATIONS TOOL:
         1. Always use the set_translations tool for any translations-related requests
         2. Always pass the COMPLETE LIST of translations to the set_translations tool. If the list had 5 translations and you removed one, you must pass the complete list of 4 remaining translations.
-        3. You can use existing translations if one is relevant to the user's request, but you can also create new translations as required. To create new translations, you MUST first use the get_genz_translation tool to generate the Gen Z version of the provided text.
-        4. Be creative and helpful in ensuring translations are complete and practical, but rely on the get_genz_translation tool for generating the Gen Z lingo.
+        3. You can use existing translations if one is relevant to the user's request, but you can also create new translations as required. To create new translations, you MUST first use the get_translations tool to generate the Gen Z version of the provided text.
+        4. Be creative and helpful in ensuring translations are complete and practical, but rely on the get_translations tool for generating the Gen Z lingo.
         5. After using the tool, provide a brief summary of what you created, removed, or changed
 
         IMPORTANT RULES ABOUT GET_TRANSLATIONS TOOL:
-        When a user provides a text to translate, you MUST:
-        1. First use the choose_translation_direction tool to ask the user for the translation direction
-        2. Wait for the response which will be in the format {{"direction": "to_genz"}} or {{"direction": "to_english"}}
-        3. Based on the direction:
-           - If "to_genz", use get_genz_translation tool
-           - If "to_english", use get_english_translation tool
-        4. After obtaining the translation, incorporate it into the translations list using set_translations
+        1. Use the get_translations tool whenever you need to generate a new Gen Z translation for a given sentence or text.
+        2. Only pass the original text to be translated as the argument to get_translations.
+        3. After obtaining the Gen Z translation, incorporate it into the translations list (e.g., as a pair of original and translated text) when using set_translations.
 
         Examples of when to use the translations tools:
-        - "Translate this for me: 'The soap is clean'" → First use choose_translation_direction with the text "The soap is clean". If the user chooses "to_genz", then use get_genz_translation. If the user chooses "to_english", then use get_english_translation. After getting the translation, use set_translations to update the list.
+        - "Add a translation for 'The soap is clean'" → First use get_translations with the text "The soap is clean" to get the Gen Z version, then use set_translations with an array containing the existing list of translations with the new translation pair at the end.
+        - "Remove the first translation" → Use set_translations with an array containing all of the existing translations except the first one.
+        - "Change any translations about cats to mention that they have 18 lives" → If no translations mention cats, do not use the set_translations tool. If one or more translations do mention cats, modify the original text accordingly, then use get_translations on the modified original to get a new Gen Z version, and use set_translations with an array of all of the translations, including ones that were changed and ones that did not require changes.
 
         Do your best to ensure translations plausibly make sense and maintain the original meaning.
 
@@ -260,7 +210,7 @@ translations_agent = LlmAgent(
         - When the user approves the essay, *ALWAYS* respond with "HERE IS THE ESSAY: <essay>".
         - When the user rejects the essay, *ALWAYS* respond with "REJECTED".
         """,
-        tools=[get_genz_translation, get_english_translation, set_translations, AgentTool(essay_agent), choose_translation_direction],
+        tools=[get_translations, set_translations, AgentTool(essay_agent)],
         before_agent_callback=on_before_agent,
         before_model_callback=before_model_modifier,
         after_model_callback = simple_after_model_modifier
