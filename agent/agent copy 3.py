@@ -17,7 +17,6 @@ from google.adk.sessions import InMemorySessionService, Session
 from google.adk.runners import Runner
 from google.adk.events import Event, EventActions
 from google.adk.tools import FunctionTool, ToolContext, AgentTool
-from google.adk.tools.long_running_tool import LongRunningFunctionTool
 from google.genai.types import Content, Part , FunctionDeclaration
 from google.adk.models import LlmResponse, LlmRequest
 from google.genai import types
@@ -137,9 +136,9 @@ def set_translations(
         return {"status": "error", "message": f"Error updating translations: {str(e)}"}
 
 
-def choose_translation_direction_adk_tool(
-    text: str, tool_context: ToolContext
-) -> Optional[Dict[str, str]]:
+def choose_translation_direction(
+    text: str
+) -> Dict[str, str]:
     """
     This function triggers the human-in-the-loop UI for choosing translation direction.
     The actual logic is handled on the frontend.
@@ -150,20 +149,10 @@ def choose_translation_direction_adk_tool(
     Returns:
         Dict containing the chosen direction ("to_genz" or "to_english")
     """
-    # This is invoked as a long-running tool: the frontend will present
-    # the choice UI and return the user's selection asynchronously.
-    # Here we set a hint on the tool_context and return None; the ADK
-    # framework will surface the UI and deliver the user's response back
-    # to the agent when ready.
-    try:
-        tool_context.actions.skip_summarization = True
-    except Exception:
-        pass
-    return None
-
-# Wrap the choose_translation_direction as a LongRunningFunctionTool so the frontend
-# will render the prompt and wait for the user's selection.
-choose_translation_direction_tool = LongRunningFunctionTool(choose_translation_direction_adk_tool)
+    # This is a tool that will be used by the agent to get user input
+    # The frontend will handle the actual UI and return the user's choice
+    # The response will be automatically returned to the agent
+    return {"direction": "to_genz"}  # This return value will be overridden by the frontend response
 
 def on_before_agent(callback_context: CallbackContext):
     """
@@ -248,18 +237,18 @@ translations_agent = LlmAgent(
         4. Be creative and helpful in ensuring translations are complete and practical, but rely on the get_genz_translation tool for generating the Gen Z lingo.
         5. After using the tool, provide a brief summary of what you created, removed, or changed
 
-          IMPORTANT RULES ABOUT TRANSLATIONS:
-          For every user message that contains a translation request (or when a translation is needed), YOU MUST:
-          1. Immediately call the choose_translation_direction tool with the text to translate. Do NOT attempt to reply to the user before calling this tool.
-          2. Wait for the user's response from the tool. The frontend will return {{"direction": "to_genz"}} or {{"direction": "to_english"}}.
-          3. Based on the returned direction:
-              - If "to_genz", call get_genz_translation with the original text.
-              - If "to_english", call get_english_translation with the original text.
-          4. After obtaining the translation, produce a translation entry string in the format:
-              - For Gen Z: "Original: [original_text] Gen Z: [translated_text]"
-              - For English: "Original: [original_text] English: [translated_text]"
-          5. Update the translations list by calling set_translations with the full updated list.
-          6. Only after set_translations completes, provide a short summary message to the user describing what you added/changed.
+        IMPORTANT RULES ABOUT TRANSLATIONS:
+        When a user provides a text to translate, you MUST:
+        1. First use the choose_translation_direction tool to ask the user for the translation direction by passing the text to translate
+        2. Wait for the response which will be in the format {{"direction": "to_genz"}} or {{"direction": "to_english"}}
+        3. Based on the direction:
+           - If "to_genz", use get_genz_translation tool with the original text
+           - If "to_english", use get_english_translation tool with the original text
+        4. After obtaining the translation response, create a new translation entry in the format:
+           - For Gen Z: "Original: [original_text] Gen Z: [translated_text]"
+           - For English: "Original: [original_text] English: [translated_text]"
+        5. Add this new translation to the existing translations list using set_translations
+        6. Always maintain the complete list of translations when using set_translations
 
         Examples of when to use the translations tools:
         - "Translate this for me: 'The soap is clean'" → First use choose_translation_direction with the text "The soap is clean". If the user chooses "to_genz", then use get_genz_translation. If the user chooses "to_english", then use get_english_translation. After getting the translation, use set_translations to update the list.
@@ -276,7 +265,7 @@ translations_agent = LlmAgent(
         - When the user approves the essay, *ALWAYS* respond with "HERE IS THE ESSAY: <essay>".
         - When the user rejects the essay, *ALWAYS* respond with "REJECTED".
         """,
-    tools=[get_genz_translation, get_english_translation, set_translations, AgentTool(essay_agent), choose_translation_direction_tool],
+        tools=[get_genz_translation, get_english_translation, set_translations, AgentTool(essay_agent), choose_translation_direction],
         before_agent_callback=on_before_agent,
         before_model_callback=before_model_modifier,
         after_model_callback = simple_after_model_modifier

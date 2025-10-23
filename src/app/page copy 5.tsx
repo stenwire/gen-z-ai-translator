@@ -2,69 +2,7 @@
 
 import { useCoAgent, useCopilotAction } from "@copilotkit/react-core";
 import { CopilotKitCSSProperties, CopilotPopup, Markdown } from "@copilotkit/react-ui";
-import { useState, useRef, useEffect } from "react";
-
-// Modal component to prompt the user for translation direction. This is used by the
-// choose_translation_direction action's renderAndWaitForResponse so hooks are allowed.
-function TranslateDirectionModal({ text, respond }: { text: string, respond?: (value: unknown) => void }) {
-  const [selection, setSelection] = useState<string | null>(null);
-  const [closed, setClosed] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-
-  if (closed) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60" />
-      <div className="relative z-10 w-full max-w-md p-6 bg-white/10 backdrop-blur-lg rounded-xl text-white">
-        <h3 className="text-lg font-semibold mb-2">Translate this text?</h3>
-        <p className="italic mb-4">&ldquo;{text}&rdquo;</p>
-
-        <div className="space-y-3">
-          <label className="flex items-center gap-3">
-            <input
-              type="radio"
-              name="direction"
-              value="to_genz"
-              checked={selection === 'to_genz'}
-              onChange={() => setSelection('to_genz')}
-            />
-            <span>Translate to Gen-Z</span>
-          </label>
-          <label className="flex items-center gap-3">
-            <input
-              type="radio"
-              name="direction"
-              value="to_english"
-              checked={selection === 'to_english'}
-              onChange={() => setSelection('to_english')}
-            />
-            <span>Translate to English</span>
-          </label>
-        </div>
-
-        <div className="mt-6 flex gap-3">
-          <button
-            onClick={() => {
-              if (!selection || submitting) return;
-              setSubmitting(true);
-              try {
-                respond?.({ direction: selection });
-              } finally {
-                // Close the modal immediately after sending the response
-                setClosed(true);
-              }
-            }}
-            disabled={!selection || submitting}
-            className={`flex-1 p-2 rounded-xl bg-blue-500 text-white font-medium ${!selection || submitting ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            {submitting ? 'Sending...' : 'Confirm'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+import { useState } from "react";
 
 export default function CopilotKitPage() {
   const [themeColor, setThemeColor] = useState("#090909ff");
@@ -92,7 +30,7 @@ export default function CopilotKitPage() {
         defaultOpen={true}
         labels={{
           title: "Gen-Z Assistant",
-          initial: "👋 Hi, there! You're chatting with a Gen-Z agent. This agent can help you translate between normal English and Gen-Z slang.\n\nFor example you can try:\n- \"Translate this to gen-z: I am so excited to start the year with a new car\"\n- \"Translate this to english: No cap fam, this whip is bussin frfr\"\n- \"Set the theme to orange\" to change the UI color\n\nWhen you send any text, you'll be asked whether to translate it to Gen-Z or to English before the agent replies."
+          initial: "👋 Hi, there! You're chatting with a Gen-Z agent. This agent comes with a few tools to get you started.\n\nFor example you can try:\n- **Frontend Tools**: \"Set the theme to orange\"\n- **Shared State**: \"Translate this to gen-z: I am so excited to start the year with a new car\"\n- **Generative UI**: \"Get the weather in SF\"\n\nAs you interact with the agent, you'll see the UI update in real-time to reflect the agent's **state**, **tool calls**, and **progress**."
         }}
       />
       <p>Chat</p>
@@ -151,46 +89,60 @@ function YourMainContent({ themeColor }: { themeColor: string }) {
   useCopilotAction({
     name: "choose_translation_direction",
     available: "enabled",
-    description: "Prompt the user to choose translation direction before the agent replies.",
+    description: "Asks the user to choose a translation direction.",
     parameters: [
       { name: "text", type: "string", description: "The text to translate", required: true },
     ],
     renderAndWaitForResponse: ({ args, respond }) => {
-      return <TranslateDirectionModal text={args.text || ''} respond={respond} />;
+      return (
+        <div className="mt-4 mb-4 bg-black/20 backdrop-blur-lg p-6 rounded-xl">
+          <h3 className="text-white text-lg font-semibold mb-4">
+            What would you like to do with the text:
+          </h3>
+          <p className="text-white mb-6 italic">&ldquo;{args.text}&rdquo;</p>
+          <div className="flex gap-4">
+            <button
+              onClick={() => {
+                if (respond) respond({ direction: "to_genz" });
+              }}
+              className="border-2 border-blue-500 hover:bg-blue-500 hover:text-white text-blue-500 p-3 rounded-xl w-full transition-all duration-200 font-medium"
+            >
+              Translate to Gen-Z
+            </button>
+            <button
+              onClick={() => {
+                if (respond) respond({ direction: "to_english" });
+              }}
+              className="bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-xl w-full transition-all duration-200 font-medium"
+            >
+              Translate to English
+            </button>
+          </div>
+        </div>
+      );
     }
   });
 
-  // Weather feature removed — translations only
+  //🪁 Generative UI: https://docs.copilotkit.ai/coagents/generative-ui
+  useCopilotAction({
+    name: "get_weather",
+    description: "Get the weather for a given location.",
+    available: "disabled",
+    parameters: [
+      { name: "location", type: "string", required: true },
+    ],
+    render: ({ args }) => {
+      return <WeatherCard location={args.location} themeColor={themeColor} />
+    },
+  });
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text).then(() => {
-      showToast('Copied to clipboard!');
+      alert('Copied to clipboard!');
     }).catch(err => {
       console.error('Failed to copy: ', err);
-      showToast('Failed to copy');
     });
   };
-
-  // Toast state and helper
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const toastTimer = useRef<number | null>(null);
-
-  const showToast = (message: string, duration = 2500) => {
-    setToastMessage(message);
-    if (toastTimer.current) {
-      window.clearTimeout(toastTimer.current);
-    }
-    toastTimer.current = window.setTimeout(() => {
-      setToastMessage(null);
-      toastTimer.current = null;
-    }, duration) as unknown as number;
-  };
-
-  useEffect(() => {
-    return () => {
-      if (toastTimer.current) window.clearTimeout(toastTimer.current);
-    };
-  }, []);
 
   return (
     <div
@@ -262,13 +214,57 @@ function YourMainContent({ themeColor }: { themeColor: string }) {
           </p>
         )}
       </div>
-      {toastMessage && (
-        <div className="fixed left-1/2 transform -translate-x-1/2 bottom-8 z-50">
-          <div className="bg-black/80 text-white px-4 py-2 rounded-lg shadow-md">{toastMessage}</div>
-        </div>
-      )}
     </div>
   );
 }
 
-// Weather-related components removed — translations only
+// Simple sun icon for the weather card
+function SunIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-14 h-14 text-yellow-200">
+      <circle cx="12" cy="12" r="5" />
+      <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" strokeWidth="2" stroke="currentColor" />
+    </svg>
+  );
+}
+
+// Weather card component where the location and themeColor are based on what the agent
+// sets via tool calls.
+function WeatherCard({ location, themeColor }: { location?: string, themeColor: string }) {
+  return (
+    <div
+      style={{ backgroundColor: themeColor }}
+      className="rounded-xl shadow-xl mt-6 mb-4 max-w-md w-full"
+    >
+      <div className="bg-white/20 p-4 w-full">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-xl font-bold text-white capitalize">{location}</h3>
+            <p className="text-white">Current Weather</p>
+          </div>
+          <SunIcon />
+        </div>
+        <div className="mt-4 flex items-end justify-between">
+          <div className="text-3xl font-bold text-white">70°</div>
+          <div className="text-sm text-white">Clear skies</div>
+        </div>
+        <div className="mt-4 pt-4 border-t border-white">
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div>
+              <p className="text-white text-xs">Humidity</p>
+              <p className="text-white font-medium">45%</p>
+            </div>
+            <div>
+              <p className="text-white text-xs">Wind</p>
+              <p className="text-white font-medium">5 mph</p>
+            </div>
+            <div>
+              <p className="text-white text-xs">Feels Like</p>
+              <p className="text-white font-medium">72°</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
